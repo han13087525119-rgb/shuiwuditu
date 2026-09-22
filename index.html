@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>通州区办税服务地图</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:#f1f5f9;color:#0f172a;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;border:0;background:none;cursor:pointer}
+#app{position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;background:#f1f5f9}
+.leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
+
+/* 顶部蓝色横幅 */
+.header{background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;z-index:50}
+.header-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.header-logo{width:36px;height:36px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+.header-title{font-size:17px;font-weight:700;line-height:1.2}
+.header-sub{font-size:11px;opacity:.85;margin-top:2px}
+.header-hotline{margin-left:auto;text-align:right}
+.header-hotline b{display:block;font-size:16px;font-weight:700}
+.header-hotline span{font-size:10px;opacity:.8}
+
+/* 筛选栏 */
+.filters{padding:0 16px 10px;display:flex;flex-direction:column;gap:8px}
+.filter-row{display:flex;gap:8px}
+.filter-select{flex:1;height:40px;padding:0 12px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;font-size:14px;color:#334155;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer;outline:none}
+.search-box{flex:1;position:relative}
+.search-box input{width:100%;height:40px;padding:0 12px 0 36px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;outline:none}
+.search-box input:focus{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.search-box svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#94a3b8}
+.reset-btn{height:40px;padding:0 16px;border:1px solid #2563eb;border-radius:8px;background:#fff;color:#2563eb;font-size:14px;font-weight:500}
+.count-text{margin-left:auto;font-size:13px;color:#64748b;white-space:nowrap}
+.count-text b{color:#2563eb;font-size:16px}
+
+/* 地图区域 */
+.map-wrap{flex:1;position:relative;z-index:1}
+#map{width:100%;height:100%;z-index:1}
+
+/* 地图悬浮按钮 */
+.map-actions{position:absolute;right:12px;top:12px;z-index:40;display:flex;flex-direction:column;gap:6px}
+.map-btn{width:38px;height:38px;border-radius:8px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;color:#334155;border:1px solid #e2e8f0}
+
+/* 图例 */
+.legend{position:absolute;left:12px;bottom:12px;z-index:40;background:#fff;border-radius:8px;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.legend-title{font-size:10px;color:#64748b;margin-bottom:4px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:#334155;margin-bottom:2px}
+.legend-item:last-child{margin:0}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+
+/* 底部列表面板 */
+.sheet{background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.1);z-index:30;transition:transform .3s ease}
+.sheet.docked{transform:translateY(calc(240px - 44px))}
+.sheet-grab{width:36px;height:4px;border-radius:2px;background:#cbd5e1;margin:8px auto;cursor:pointer}
+.sheet-head{padding:0 16px 8px;display:flex;align-items:center;justify-content:space-between}
+.sheet-title{font-size:15px;font-weight:700}
+.sheet-count{font-size:12px;color:#94a3b8}
+.sheet-list{height:calc(40dvh);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px 20px}
+.sheet-list::-webkit-scrollbar{display:none}
+.sheet.docked .sheet-list{height:0;overflow:hidden}
+
+/* 分组 */
+.cat-group{margin-bottom:4px}
+.cat-header{padding:8px 0;font-size:12px;font-weight:600;color:#64748b;display:flex;align-items:center;gap:6px}
+.cat-dot{width:8px;height:8px;border-radius:50%}
+.cat-count{margin-left:auto;font-weight:400;font-size:11px;color:#cbd5e1}
+
+/* 点位卡片 */
+.office-card{padding:12px;background:#f8fafc;border-radius:10px;margin-bottom:8px;cursor:pointer;border:1px solid transparent}
+.office-card:active{transform:scale(.98)}
+.office-card.active{border-color:#2563eb;background:#eff6ff}
+.office-name{font-size:14px;font-weight:600;margin-bottom:4px}
+.office-addr{font-size:12px;color:#64748b;margin-bottom:3px}
+.office-hours{font-size:11px;color:#94a3b8;margin-bottom:6px}
+.office-juris{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;background:#ecfdf5;color:#059669;margin-bottom:6px}
+.office-tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:10px;padding:2px 6px;border-radius:4px}
+.tag.service{background:#dbeafe;color:#2563eb}
+.tag.specialized{background:#fff7ed;color:#ea580c}
+.tag.key{background:#f5f3ff;color:#7c3aed}
+.tag.local{background:#ecfdf5;color:#059669}
+
+/* 详情弹层 */
+.detail{position:absolute;left:12px;right:12px;bottom:calc(240px + 12px);z-index:45;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:16px;display:none}
+.detail.on{display:block}
+.detail-close{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:16px;color:#64748b}
+.detail-name{font-size:15px;font-weight:700;margin-bottom:6px;padding-right:30px}
+.detail-addr{font-size:12px;color:#64748b;margin-bottom:4px}
+.detail-hours{font-size:12px;color:#64748b;margin-bottom:10px}
+.detail-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px}
+.nav-row{display:flex;gap:8px;padding-top:12px;border-top:1px solid #e2e8f0}
+.nav-btn{flex:1;height:40px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;text-decoration:none;color:white}
+.nav-gaode{background:#00a6fb}
+.nav-baidu{background:#4e6ef2}
+.nav-tencent{background:#07c160}
+
+/* 筛选弹窗 */
+.scrim{position:absolute;inset:0;z-index:80;background:rgba(0,0,0,.4);display:none}
+.scrim.on{display:block}
+.filter-sheet{position:absolute;left:0;right:0;bottom:0;z-index:85;background:#fff;border-radius:16px 16px 0 0;padding:12px 20px calc(env(safe-area-inset-bottom) + 20px);max-height:75dvh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease}
+.filter-sheet.on{transform:none}
+.filter-grab{width:36px;height:4px;border-radius:2px;background:#cbd5e1;margin:0 auto 16px}
+.filter-group{margin-bottom:16px}
+.filter-group-title{font-size:13px;font-weight:600;margin-bottom:8px}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:6px 12px;border-radius:16px;background:#f1f5f9;border:1px solid #e2e8f0;font-size:12px;cursor:pointer}
+.chip.on{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
+.filter-actions{display:flex;gap:10px;margin-top:20px}
+.filter-reset{flex:1;height:44px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px}
+.filter-apply{flex:2;height:44px;border-radius:10px;background:#2563eb;color:#fff;font-size:14px;font-weight:600}
+
+/* Toast */
+.toast{position:absolute;left:50%;bottom:calc(240px + 60px);z-index:70;transform:translateX(-50%);background:rgba(15,23,42,.88);color:#fff;padding:10px 16px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap}
+.toast.on{opacity:1}
+
+/* 标记点 */
+.marker-pin{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:grid;place-items:center}
+.marker-pin-inner{width:8px;height:8px;background:#fff;border-radius:50%;transform:rotate(45deg)}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 顶部横幅 -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-logo">税</div>
+      <div>
+        <div class="header-title">通州区办税服务地图</div>
+        <div class="header-sub">税务所一站式查询</div>
+      </div>
+      <div class="header-hotline"><span>服务热线</span><b>010-12366</b></div>
+    </div>
+  </div>
+
+  <!-- 筛选栏 -->
+  <div class="filters">
+    <div class="filter-row">
+      <select class="filter-select" id="areaFilter">
+        <option value="">全部辖区</option>
+      </select>
+      <select class="filter-select" id="catFilter">
+        <option value="">全部类别</option>
+        <option value="办税服务厅">办税服务厅</option>
+        <option value="专业事项管理机构">专业事项管理机构</option>
+        <option value="重点税源管理机构">重点税源管理机构</option>
+        <option value="属地税源管理机构">属地税源管理机构</option>
+      </select>
+    </div>
+    <div class="filter-row">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="searchInput" placeholder="搜索名称或地址">
+      </div>
+      <button class="reset-btn" onclick="resetAll()">重置</button>
+      <div class="count-text">共<b id="totalCount">16</b>点</div>
+    </div>
+  </div>
+
+  <!-- 地图 -->
+  <div class="map-wrap"><div id="map"></div></div>
+
+  <!-- 地图按钮 -->
+  <div class="map-actions">
+    <button class="map-btn" onclick="zoomIn()">+</button>
+    <button class="map-btn" onclick="zoomOut()">−</button>
+    <button class="map-btn" onclick="locateMe()">◎</button>
+  </div>
+
+  <!-- 图例 -->
+  <div class="legend">
+    <div class="legend-title">图例</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2563eb"></div>办税服务厅</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ea580c"></div>专业事项</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div>重点税源</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#059669"></div>属地管理</div>
+  </div>
+
+  <!-- 底部列表 -->
+  <div class="sheet docked" id="sheet">
+    <div class="sheet-grab" onclick="toggleSheet()"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">办税点位</span>
+      <span class="sheet-count" id="listCount">共 16 条</span>
+    </div>
+    <div class="sheet-list" id="sheetList"></div>
+  </div>
+
+  <!-- 详情 -->
+  <div class="detail" id="detail">
+    <button class="detail-close" onclick="closeDetail()">×</button>
+    <div id="detailBody"></div>
+  </div>
+
+  <!-- 筛选弹窗 -->
+  <div class="scrim" id="scrim" onclick="closeFilter()"></div>
+  <div class="filter-sheet" id="filterSheet">
+    <div class="filter-grab"></div>
+    <div class="filter-group">
+      <div class="filter-group-title">辖区筛选</div>
+      <div class="chip-row" id="areaChips"></div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-group-title">机构类别</div>
+      <div class="chip-row" id="catChips"></div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-group-title">主要业务</div>
+      <div class="chip-row" id="svcChips"></div>
+    </div>
+    <div class="filter-actions">
+      <button class="filter-reset" onclick="resetAll()">重置</button>
+      <button class="filter-apply" onclick="closeFilter()">查看结果</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const data=[
+  {id:1,name:"第一税务所（办税服务厅）",cat:"办税服务厅",addr:"北京市通州区玉桥西里71号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["综合办税","发票业务","自助办税"],juris:[],lat:39.8968,lng:116.6592},
+  {id:2,name:"第二税务所",cat:"重点税源管理机构",addr:"北京市通州区玉桥中路136号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["重点税源企业","房地产业","金融业","成品油行业"],juris:[],lat:39.9012,lng:116.6618},
+  {id:3,name:"第三税务所",cat:"专业事项管理机构",addr:"北京市通州区新华东街48号二区",hours:"工作日 8:30-12:00；13:30-17:00",svc:["不动产交易税费管理"],juris:[],lat:39.9095,lng:116.6545},
+  {id:4,name:"第四税务所",cat:"专业事项管理机构",addr:"北京市通州区永顺镇永顺家园底商",hours:"工作日 8:30-12:00；13:30-17:00",svc:["复杂欠税追征","优惠政策后续管理","出口退税监督","注销税务登记","破产重整","成品油税收监督","非即办发票赋额","股权转让监督"],juris:[],lat:39.9210,lng:116.6425},
+  {id:5,name:"运河商务区税务所",cat:"属地税源管理机构",addr:"北京市通州区新华北路55号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理","房地产开发行业"],juris:["运河商务区"],lat:39.9148,lng:116.6488},
+  {id:6,name:"北苑税务所",cat:"专业事项管理机构",addr:"北京市通州区滨河中路257号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["风控核查任务应对"],juris:[],lat:39.9055,lng:116.6395},
+  {id:7,name:"玉桥税务所",cat:"属地税源管理机构",addr:"北京市通州区滨河中路257号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["中仓街道","玉桥街道","临河里街道"],lat:39.8945,lng:116.6575},
+  {id:8,name:"潞源税务所",cat:"属地税源管理机构",addr:"北京市通州区荔景西路紫运西里26号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["潞源街道","通运街道","潞城镇"],lat:39.9420,lng:116.6685},
+  {id:9,name:"永顺税务所",cat:"属地税源管理机构",addr:"北京市通州区新华北路55号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理","涉税专业服务机构管理"],juris:["潞邑街道"],lat:39.9185,lng:116.6465},
+  {id:10,name:"梨园税务所",cat:"属地税源管理机构",addr:"北京市通州区京洲南街62号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["九棵树街道","杨庄街道","梨园镇"],lat:39.8785,lng:116.6628},
+  {id:11,name:"宋庄税务所",cat:"属地税源管理机构",addr:"北京市通州区宋庄镇后夏公庄",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["宋庄镇"],lat:39.9655,lng:116.6780},
+  {id:12,name:"漷县税务所",cat:"属地税源管理机构",addr:"北京市通州区漷县镇漷兴一街",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["漷县镇"],lat:39.8465,lng:116.6185},
+  {id:13,name:"张家湾税务所",cat:"属地税源管理机构",addr:"北京市通州区张家湾镇政府南",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["张家湾镇"],lat:39.8385,lng:116.6495},
+  {id:14,name:"西集税务所",cat:"属地税源管理机构",addr:"北京市通州区西集镇卫生院东侧",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["西集镇"],lat:39.8605,lng:116.7055},
+  {id:15,name:"永乐店税务所",cat:"属地税源管理机构",addr:"北京市通州区永乐店镇政府东侧",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["永乐店镇","于家务回族乡"],lat:39.8265,lng:116.5895},
+  {id:16,name:"台湖税务所",cat:"属地税源管理机构",addr:"北京市通州区台湖镇新华联工业园南区2号",hours:"工作日 8:30-12:00；13:30-17:00",svc:["辖区一般税费源管理","个体户管理"],juris:["台湖镇"],lat:39.8995,lng:116.6925}
+];
+
+const catColor={"办税服务厅":"#2563eb","专业事项管理机构":"#ea580c","重点税源管理机构":"#7c3aed","属地税源管理机构":"#059669"};
+const catTag={"办税服务厅":"service","专业事项管理机构":"specialized","重点税源管理机构":"key","属地税源管理机构":"local"};
+
+let map,layer,markers={};
+let fArea="",fCat="",fSvc="",kw="",selId=null;
+
+function initMap(){
+  map=L.map('map',{center:[39.905,116.66],zoom:12,zoomControl:false});
+  L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',{subdomains:['1','2','3','4'],maxZoom:18}).addTo(map);
+  layer=L.layerGroup().addTo(map);
+}
+
+function mkIcon(o){
+  const c=catColor[o.cat];
+  return L.divIcon({className:'',html:`<div class="marker-pin" style="background:${c}"><div class="marker-pin-inner"></div></div>`,iconSize:[26,26],iconAnchor:[13,26]});
+}
+
+function filtered(){
+  return data.filter(o=>{
+    if(fArea&&!o.juris.includes(fArea))return false;
+    if(fCat&&o.cat!==fCat)return false;
+    if(fSvc&&!o.svc.includes(fSvc))return false;
+    if(kw){const t=(o.name+o.addr+o.svc.join("")).toLowerCase();if(!t.includes(kw))return false;}
+    return true;
+  });
+}
+
+function renderMarkers(){
+  layer.clearLayers();markers={};
+  const list=filtered();
+  list.forEach(o=>{
+    const m=L.marker([o.lat,o.lng],{icon:mkIcon(o)});
+    m.on('click',()=>select(o.id));
+    m.addTo(layer);markers[o.id]=m;
+  });
+  if(list.length){const b=L.latLngBounds(list.map(o=>[o.lat,o.lng]));map.fitBounds(b,{padding:[40,40]});}
+}
+
+function renderList(){
+  const list=filtered();
+  const box=document.getElementById('sheetList');
+  document.getElementById('totalCount').textContent=list.length;
+  document.getElementById('listCount').textContent=`共 ${list.length} 条`;
+  box.innerHTML='';
+  if(!list.length){box.innerHTML='<div style="text-align:center;padding:40px;color:#94a3b8;font-size:13px">未找到</div>';return;}
+  const g={};list.forEach(o=>{if(!g[o.cat])g[o.cat]=[];g[o.cat].push(o)});
+  ["办税服务厅","专业事项管理机构","重点税源管理机构","属地税源管理机构"].filter(c=>g[c]).forEach(c=>{
+    const d=document.createElement('div');d.className='cat-group';
+    d.innerHTML=`<div class="cat-header"><div class="cat-dot" style="background:${catColor[c]}"></div>${c}<span class="cat-count">${g[c].length}</span></div>`;
+    g[c].forEach(o=>{
+      const card=document.createElement('div');card.className='office-card'+(o.id===selId?' active':'');
+      const j=o.juris.length?`<div class="office-juris">管辖：${o.juris.join('、')}</div>`:'';
+      const t=o.svc.slice(0,3).map(s=>`<span class="tag ${catTag[o.cat]}">${s}</span>`).join('');
+      card.innerHTML=`<div class="office-name">${o.name}</div><div class="office-addr">${o.addr}</div><div class="office-hours">${o.hours}</div>${j}<div class="office-tags">${t}</div>`;
+      card.onclick=()=>select(o.id);d.appendChild(card);
+    });
+    box.appendChild(d);
+  });
+}
+
+function select(id){
+  selId=id;const o=data.find(x=>x.id===id);
+  renderMarkers();renderList();
+  if(o){map.setView([o.lat,o.lng],14,{animate:true});showDetail(o);document.getElementById('sheet').classList.remove('docked');}
+}
+
+function showDetail(o){
+  const enc=encodeURIComponent(o.name);
+  const j=o.juris.length?`<div class="office-addr">管辖：${o.juris.join('、')}</div>`:'';
+  const t=o.svc.map(s=>`<span class="tag ${catTag[o.cat]}">${s}</span>`).join('');
+  document.getElementById('detailBody').innerHTML=`
+    <div class="detail-name">${o.name}</div>
+    <div class="detail-addr">${o.addr}</div>${j}
+    <div class="detail-hours">办公时间：${o.hours}</div>
+    <div class="detail-tags">${t}</div>
+    <div class="nav-row">
+      <a class="nav-btn nav-gaode" href="https://uri.amap.com/navigation?to=${o.lng},${o.lat},${enc}&mode=car&src=tmap&callnative=1" target="_blank">高德导航</a>
+      <a class="nav-btn nav-baidu" href="https://api.map.baidu.com/direction?destination=latlng:${o.lat},${o.lng}|name:${enc}&mode=driving&coord_type=gcj02&output=html" target="_blank">百度导航</a>
+      <a class="nav-btn nav-tencent" href="https://apis.map.qq.com/uri/v1/routeplan?type=drive&to=${enc}&tocoord=${o.lat},${o.lng}&referer=tmap" target="_blank">腾讯导航</a>
+    </div>`;
+  document.getElementById('detail').classList.add('on');
+}
+function closeDetail(){document.getElementById('detail').classList.remove('on')}
+function toggleSheet(){document.getElementById('sheet').classList.toggle('docked')}
+
+function initChips(){
+  const areas=[...new Set(data.flatMap(o=>o.juris))].sort();
+  const svcs=[...new Set(data.flatMap(o=>o.svc))].sort();
+  function build(arr,cid,cur){
+    const c=document.getElementById(cid);c.innerHTML=`<button class="chip${cur===''?' on':''}" data="">全部</button>`;
+    arr.forEach(v=>{const b=document.createElement('button');b.className=`chip${cur===v?' on':''}`;b.textContent=v;b.dataset.v=v;
+      b.onclick=()=>{c.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+        if(cid==='areaChips')fArea=v;if(cid==='catChips')fCat=v;if(cid==='svcChips')fSvc=v;};
+      c.appendChild(b);});
+  }
+  build(areas,'areaChips',fArea);build(["办税服务厅","专业事项管理机构","重点税源管理机构","属地税源管理机构"],'catChips',fCat);build(svcs,'svcChips',fSvc);
+}
+function openFilter(){initChips();document.getElementById('scrim').classList.add('on');document.getElementById('filterSheet').classList.add('on')}
+function closeFilter(){document.getElementById('scrim').classList.remove('on');document.getElementById('filterSheet').classList.remove('on');renderMarkers();renderList()}
+function resetAll(){fArea=fCat=fSvc=kw='';selId=null;document.getElementById('searchInput').value='';document.getElementById('areaFilter').value='';document.getElementById('catFilter').value='';closeDetail();renderMarkers();renderList();toast('已重置')}
+
+function zoomIn(){map.zoomIn()}function zoomOut(){map.zoomOut()}
+function locateMe(){if(navigator.geolocation){navigator.geolocation.getCurrentPosition(p=>{map.setView([p.coords.latitude,p.coords.longitude],15,{animate:true});toast('已定位')},()=>toast('定位失败'))}else{toast('不支持定位')}}
+
+let tt;function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),1500)}
+
+// 下拉筛选
+const areaSel=document.getElementById('areaFilter');
+[...new Set(data.flatMap(o=>o.juris))].sort().forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=a;areaSel.appendChild(o)});
+areaSel.onchange=e=>{fArea=e.target.value;renderMarkers();renderList()};
+document.getElementById('catFilter').onchange=e=>{fCat=e.target.value;renderMarkers();renderList()};
+document.getElementById('searchInput').oninput=e=>{kw=e.target.value.trim().toLowerCase();renderMarkers();renderList()};
+
+initMap();renderMarkers();renderList();
+</script>
+</body>
+</html>
